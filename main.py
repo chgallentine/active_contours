@@ -2,7 +2,7 @@
 # @Author: Charlie Gallentine
 # @Date:   2020-06-28 19:52:40
 # @Last Modified by:   Charlie Gallentine
-# @Last Modified time: 2020-06-28 19:56:54
+# @Last Modified time: 2020-06-28 21:32:12
 
 import cv2
 import numpy as np 
@@ -15,6 +15,7 @@ contour_points = [(88,156),(144,151),(170,110),(205,155),(241,155),(189,224),(13
 
 img = np.array(cv2.imread('star.jpg',0))
 lap = np.array(img_laplacian(img))
+lap = add_border(lap)
 
 contour = Contour(contour_points)
 
@@ -29,6 +30,7 @@ contour.insert_points()
 allimgs = []
 for i in range(100):
 	lapcpy = np.copy(lap)
+
 	contour.calc_energies(lapcpy)
 
 	contour.update_points()
