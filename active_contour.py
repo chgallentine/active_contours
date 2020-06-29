@@ -2,7 +2,7 @@
 # @Author: charliegallentine
 # @Date:   2020-06-25 22:39:04
 # @Last Modified by:   Charlie Gallentine
-# @Last Modified time: 2020-06-28 19:54:53
+# @Last Modified time: 2020-06-28 21:11:10
 
 import cv2
 import numpy as np 
@@ -34,17 +34,17 @@ class ContourPoint:
 		# Square of distance between points
 		# 	Encourages points to spread to/from each other
 		# 	Internal
-		self.energy_distance = np.empty((7,7),dtype=float)
+		# self.energy_distance = np.empty((7,7),dtype=float)
 
 		# Square of deviation from avg distance
 		# 	Encourages points to maintain equal distance
 		# 	Internal
-		self.energy_deviation = np.empty((7,7),dtype=float)
+		# self.energy_deviation = np.empty((7,7),dtype=float)
 
 		# Square of image gradient
 		# 	Encourages contour to snap to lines
 		# 	External
-		self.energy_gradient = np.empty((7,7),dtype=float)
+		# self.energy_gradient = np.empty((7,7),dtype=float)
 
 		# Total Energies
 		self.energies = np.empty((7,7),dtype=float)
@@ -63,45 +63,51 @@ class ContourPoint:
 		r = self.row
 		c = self.col
 
+		energy_distance = np.zeros((7,7),dtype=float)
+
 		for i in range(-3,4):
 			for j in range(-3,4):
 				# (x2 - x1)^2 + (y2 - y1)^2
-				self.energy_distance[i+3,j+3] = np.sum(np.square((r+i) - contour_r) + np.square((c+j) - contour_c))
+				energy_distance[i+3,j+3] = np.sum(np.square((r+i) - contour_r) + np.square((c+j) - contour_c))
 
-		self.energy_distance = 1.0 - norm_0_1(self.energy_distance)
+		self.energies = np.dstack((self.energies,1.0 - norm_0_1(energy_distance)))
 
 	# Attempts to move points to center of neighbors
 	def calc_energy_deviation(self,prior_point,next_point):
 		r = self.row
 		c = self.col
 
+		energy_deviation = np.zeros((7,7),dtype=float)
+
 		for i in range(-3,4):
 			for j in range(-3,4):
 				d2n = np.square(r+i - next_point.row) + np.square(c+j - next_point.col)
 				d2p = np.square(r+i - prior_point.row) + np.square(c+j - prior_point.col)
 
-				self.energy_deviation[i+3,j+3] = np.power(np.absolute(d2n - d2p),2)
+				energy_deviation[i+3,j+3] = np.power(np.absolute(d2n - d2p),2)
 
-		self.energy_deviation = norm_0_1(self.energy_deviation)
+		self.energies = np.dstack((self.energies,norm_0_1(energy_deviation)),)
 
 	# Pulls contour to higher values on grayscale image
 	def calc_energy_gradient(self, img):
 		r = self.row
 		c = self.col
 
+		energy_gradient = np.zeros((7,7),dtype=float)
+
 		for i in range(-3,4):
 			for j in range(-3,4):
-				self.energy_gradient[i+3,j+3] = np.square(img[r+i,c+j])
+				energy_gradient[i+3,j+3] = np.square(img[r+i,c+j])
 
-		self.energy_gradient = 1.0 - norm_0_1(self.energy_gradient)
+		self.energies = np.dstack((self.energies,1.0 - norm_0_1(energy_gradient)))
 
 	# add all energies in contour
 	def add_energies(self):
-		self.energy = self.energy_distance + self.energy_deviation + self.energy_gradient
+		self.energies = np.sum(self.energies,axis=2)
 
 
 	def adjust_point(self):
-		minimum_energy = np.argmin(self.energy)
+		minimum_energy = np.argmin(self.energies)
 
 		# 0,0 : 0,1 : 0,2 : 0,3 : 0,4 : 0,5 : 0,6
 		# 1,0 : 1,1 : 1,2 : 1,3 : 1,4 : 1,5 : 1,6
@@ -160,6 +166,8 @@ class Contour:
 				prior_point = self.contour[-1]
 			else:
 				prior_point = self.contour[i-1]
+
+			point.energies = np.zeros((7,7))
 
 			point.calc_energy_distance(self.contour_r, self.contour_c)
 			point.calc_energy_deviation(prior_point,next_point)
